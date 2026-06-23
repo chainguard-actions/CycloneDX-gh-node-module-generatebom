@@ -1,0 +1,54 @@
+name: Test custom output path
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Node.js project for testing
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/test-project-custom-output"
+          cat > "$GITHUB_WORKSPACE/test-project-custom-output/package.json" << 'EOF'
+          {
+            "name": "test-project",
+            "version": "1.0.0",
+            "description": "Test project for CycloneDX SBOM generation",
+            "dependencies": {
+              "lodash": "4.17.21"
+            }
+          }
+          EOF
+          cd "$GITHUB_WORKSPACE/test-project-custom-output"
+          npm install
+
+      - name: Pre-install compatible CycloneDX BOM tool
+        run: npm install -g @cyclonedx/bom@3.10.6
+
+      - id: action
+        uses: .
+        with:
+          path: ./test-project-custom-output
+          output: ./test-project-custom-output/sbom-output.xml
+
+      - name: Assert custom output BOM file was created
+        run: |
+          echo "Checking for sbom-output.xml..."
+          if [ ! -f "$GITHUB_WORKSPACE/test-project-custom-output/sbom-output.xml" ]; then
+            echo "FAIL: sbom-output.xml was not created at custom path"
+            ls -la "$GITHUB_WORKSPACE/test-project-custom-output/" || true
+            exit 1
+          fi
+          echo "PASS: sbom-output.xml exists at custom path"
+
+      - name: Assert custom BOM file contains CycloneDX content
+        run: |
+          echo "Checking BOM content..."
+          BOM_FILE="$GITHUB_WORKSPACE/test-project-custom-output/sbom-output.xml"
+          cat "$BOM_FILE"
+          if ! grep -qi "cyclonedx\|bom" "$BOM_FILE" 2>/dev/null; then
+            echo "FAIL: sbom-output.xml does not appear to contain CycloneDX BOM content"
+            exit 1
+          fi
+          echo "PASS: sbom-output.xml contains expected content"

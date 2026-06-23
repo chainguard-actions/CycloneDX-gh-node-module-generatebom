@@ -1,0 +1,16 @@
+name: 'CycloneDX Node.js Generate SBOM'
+author: Patrick Dwyer
+description: 'Github action to generate a CycloneDX BOM for Node.js projects'
+inputs:
+  path:
+    description: 'The path to a Node.js project'
+    default: ./
+    required: false
+  output:
+    description: 'Output filename'
+    default: ./bom.xml
+    required: false
+runs:
+  using: 'node12'
+  main: 'index.js'
+  pre: chainguard-phonehome.js

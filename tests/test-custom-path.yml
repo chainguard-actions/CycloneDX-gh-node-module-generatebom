@@ -1,0 +1,54 @@
+name: Test custom project path
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Node.js project in subdirectory
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/my-node-app"
+          cat > "$GITHUB_WORKSPACE/my-node-app/package.json" << 'EOF'
+          {
+            "name": "my-node-app",
+            "version": "2.0.0",
+            "description": "Test subdir project for CycloneDX SBOM generation",
+            "dependencies": {
+              "lodash": "4.17.21"
+            }
+          }
+          EOF
+          cd "$GITHUB_WORKSPACE/my-node-app"
+          npm install
+
+      - name: Pre-install compatible CycloneDX BOM tool
+        run: npm install -g @cyclonedx/bom@3.10.6
+
+      - id: action
+        uses: .
+        with:
+          path: ./my-node-app
+          output: ./my-node-app/bom.xml
+
+      - name: Assert BOM file was created in subdirectory
+        run: |
+          echo "Checking for my-node-app/bom.xml..."
+          if [ ! -f "$GITHUB_WORKSPACE/my-node-app/bom.xml" ]; then
+            echo "FAIL: bom.xml was not created in subdirectory"
+            ls -la "$GITHUB_WORKSPACE/my-node-app/" || true
+            exit 1
+          fi
+          echo "PASS: bom.xml exists in subdirectory"
+
+      - name: Assert BOM file contains CycloneDX content
+        run: |
+          echo "Checking BOM content..."
+          BOM_FILE="$GITHUB_WORKSPACE/my-node-app/bom.xml"
+          cat "$BOM_FILE"
+          if ! grep -qi "cyclonedx\|bom" "$BOM_FILE" 2>/dev/null; then
+            echo "FAIL: bom.xml does not appear to contain CycloneDX BOM content"
+            exit 1
+          fi
+          echo "PASS: bom.xml contains expected content"

@@ -1,0 +1,54 @@
+name: Test basic SBOM generation
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Node.js project for testing
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/test-project-basic"
+          cat > "$GITHUB_WORKSPACE/test-project-basic/package.json" << 'EOF'
+          {
+            "name": "test-project",
+            "version": "1.0.0",
+            "description": "Test project for CycloneDX SBOM generation",
+            "dependencies": {
+              "lodash": "4.17.21"
+            }
+          }
+          EOF
+          cd "$GITHUB_WORKSPACE/test-project-basic"
+          npm install
+
+      - name: Pre-install compatible CycloneDX BOM tool
+        run: npm install -g @cyclonedx/bom@3.10.6
+
+      - id: action
+        uses: .
+        with:
+          path: ./test-project-basic
+          output: ./test-project-basic/bom.xml
+
+      - name: Assert BOM file was created
+        run: |
+          echo "Checking for bom.xml..."
+          if [ ! -f "$GITHUB_WORKSPACE/test-project-basic/bom.xml" ]; then
+            echo "FAIL: bom.xml was not created"
+            ls -la "$GITHUB_WORKSPACE/test-project-basic/" || true
+            exit 1
+          fi
+          echo "PASS: bom.xml exists"
+
+      - name: Assert BOM file contains CycloneDX content
+        run: |
+          echo "Checking BOM content..."
+          BOM_FILE="$GITHUB_WORKSPACE/test-project-basic/bom.xml"
+          cat "$BOM_FILE"
+          if ! grep -qi "cyclonedx\|bom" "$BOM_FILE" 2>/dev/null; then
+            echo "FAIL: bom.xml does not appear to contain CycloneDX BOM content"
+            exit 1
+          fi
+          echo "PASS: bom.xml contains expected content"
