@@ -1,0 +1,1 @@
+# CycloneDX-gh-node-module-generatebom
