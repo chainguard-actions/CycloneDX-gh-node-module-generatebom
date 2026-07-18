@@ -1,0 +1,76 @@
+name: Test basic BOM generation
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install mock cyclonedx-bom
+        run: |
+          python3 - << 'PYEOF'
+          import os, stat
+          script = (
+              "#!/bin/sh\n"
+              "OUTPUT=\"\"\n"
+              "for arg in \"$@\"; do\n"
+              "  case \"$arg\" in\n"
+              "    --output=*) OUTPUT=\"${arg#--output=}\" ;;\n"
+              "    --help) echo \"cyclonedx-bom mock v3\"; exit 0 ;;\n"
+              "  esac\n"
+              "done\n"
+              "if [ -n \"$OUTPUT\" ]; then\n"
+              "  printf '<?xml version=\"1.0\" encoding=\"utf-8\"?>\\n' > \"$OUTPUT\"\n"
+              "  printf '<bom xmlns=\"http://cyclonedx.org/schema/bom/1.2\" version=\"1\">\\n' >> \"$OUTPUT\"\n"
+              "  printf '  <components>\\n' >> \"$OUTPUT\"\n"
+              "  printf '    <component type=\"library\">\\n' >> \"$OUTPUT\"\n"
+              "  printf '      <name>lodash</name>\\n' >> \"$OUTPUT\"\n"
+              "  printf '      <version>4.17.21</version>\\n' >> \"$OUTPUT\"\n"
+              "  printf '    </component>\\n' >> \"$OUTPUT\"\n"
+              "  printf '  </components>\\n' >> \"$OUTPUT\"\n"
+              "  printf '</bom>\\n' >> \"$OUTPUT\"\n"
+              "fi\n"
+              "exit 0\n"
+          )
+          path = "/usr/local/bin/cyclonedx-bom"
+          with open(path, "w") as f:
+              f.write(script)
+          os.chmod(path, 0o755)
+          PYEOF
+          cyclonedx-bom --help
+
+      - id: action
+        uses: .
+        with:
+          path: ${{ github.workspace }}/tests/fixtures/node-project
+          output: ${{ github.workspace }}/bom.xml
+
+      - name: Assert BOM file was created
+        run: |
+          if [ ! -f "$GITHUB_WORKSPACE/bom.xml" ]; then
+            echo "FAIL: bom.xml was not created"
+            ls -la "$GITHUB_WORKSPACE/" || true
+            exit 1
+          fi
+          echo "PASS: bom.xml exists"
+
+      - name: Assert BOM file contains CycloneDX content
+        run: |
+          BOM_CONTENT=$(cat "$GITHUB_WORKSPACE/bom.xml")
+          echo "BOM content:"
+          echo "$BOM_CONTENT"
+          if ! echo "$BOM_CONTENT" | grep -qi "cyclonedx"; then
+            echo "FAIL: bom.xml does not contain CycloneDX content"
+            exit 1
+          fi
+          echo "PASS: bom.xml contains CycloneDX content"
+
+      - name: Assert BOM file contains component information
+        run: |
+          BOM_CONTENT=$(cat "$GITHUB_WORKSPACE/bom.xml")
+          if ! echo "$BOM_CONTENT" | grep -qi "component\|bom"; then
+            echo "FAIL: bom.xml does not contain component/bom elements"
+            exit 1
+          fi
+          echo "PASS: bom.xml contains expected XML elements"

@@ -1,0 +1,10 @@
+{
+  "name": "test-project",
+  "version": "1.0.0",
+  "description": "A test Node.js project for CycloneDX BOM generation",
+  "main": "index.js",
+  "dependencies": {
+    "lodash": "4.17.21"
+  },
+  "devDependencies": {}
+}

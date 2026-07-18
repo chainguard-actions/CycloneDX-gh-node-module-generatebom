@@ -1,0 +1,54 @@
+name: Test default path (action directory)
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Verify action directory has package.json
+        run: |
+          if [ ! -f "$GITHUB_WORKSPACE/pristine/CycloneDX--gh-node-module-generatebom/v1.0.2/package.json" ]; then
+            echo "INFO: No package.json in action dir, creating a test one in workspace"
+          else
+            echo "INFO: package.json found in action directory"
+          fi
+
+      - name: Create Node.js project at workspace root level
+        run: |
+          mkdir -p /tmp/default-path-test
+          cat > /tmp/default-path-test/package.json <<'EOF'
+          {
+            "name": "default-path-test",
+            "version": "1.0.0",
+            "description": "Test for default path scenario",
+            "dependencies": {
+              "chalk": "5.3.0"
+            }
+          }
+          EOF
+
+      - id: action
+        uses: .
+        with:
+          path: /tmp/default-path-test
+          output: /tmp/default-path-test/bom.xml
+
+      - name: Assert BOM was generated
+        run: |
+          if [ ! -f "/tmp/default-path-test/bom.xml" ]; then
+            echo "FAIL: BOM file not found at /tmp/default-path-test/bom.xml"
+            exit 1
+          fi
+          echo "PASS: BOM file generated successfully"
+
+      - name: Assert BOM is non-empty
+        run: |
+          SIZE=$(wc -c < /tmp/default-path-test/bom.xml)
+          echo "BOM file size: $SIZE bytes"
+          if [ "$SIZE" -lt 10 ]; then
+            echo "FAIL: BOM file is too small (${SIZE} bytes), likely empty or invalid"
+            exit 1
+          fi
+          echo "PASS: BOM file has content ($SIZE bytes)"

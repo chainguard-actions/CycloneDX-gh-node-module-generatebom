@@ -1,14 +1,65 @@
-# CycloneDX/gh-node-module-generatebom
+[![Website](https://img.shields.io/badge/https://-cyclonedx.org-blue.svg)](https://cyclonedx.org/)
+[![Slack Invite](https://img.shields.io/badge/Slack-Join-blue?logo=slack&labelColor=393939)](https://cyclonedx.org/slack/invite)
+[![Group Discussion](https://img.shields.io/badge/discussion-groups.io-blue.svg)](https://groups.io/g/CycloneDX)
+[![Twitter](https://img.shields.io/twitter/url/http/shields.io.svg?style=social&label=Follow)](https://twitter.com/CycloneDX_Spec)
 
-Github action to generate a CycloneDX BOM for Node.js projects
+# GitHub action to generate a CycloneDX SBOM for Node.js
 
-Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at [https://github.com/CycloneDX/gh-node-module-generatebom](https://github.com/CycloneDX/gh-node-module-generatebom).
+This GitHub action will create a a valid CycloneDX Software Bill-of-Materials (SBOM) containing an aggregate of all project dependencies. CycloneDX is a lightweight SBOM specification that is easily created, human and machine readable, and simple to parse.
 
-## Versions
+This GitHub action requires a node_modules directory so this action will typically need to run after an npm build.
 
-| Version | Tag | Upstream commit |
-|---------|-----|-----------------|
-| v1.0.0 | [`v1.0.0`](https://github.com/chainguard-actions/CycloneDX-gh-node-module-generatebom/tree/v1.0.0) | [`b5753d5`](https://github.com/CycloneDX/gh-node-module-generatebom/commit/b5753d516608ed84f7a40eb19b7687b5828b9b2d) |
+## Inputs
+
+### `path`
+
+The path to a Node.js project, default is "./"
+
+Be sure to quote paths with spaces.
+
+### `output`
+
+Output filename, default is "./bom.xml"
+
+Be sure to quote paths with spaces.
+
+## Example simple usage
+
+```
+uses: CycloneDX/gh-node-module-generatebom@master
+```
+
+## Example step that defines the output and path (both are optional)
+
+```
+- name: Create SBOM step
+  uses: CycloneDX/gh-node-module-generatebom@master
+  with:
+    path: './node_project/'
+    output: './bom_directory/test.app.bom.xml'
+```
+
+## Complete Action with npm build and SBOM creation
+
+```
+name: Build javascript project
+on: push
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    name: Install and build javascript
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup node
+        uses: actions/setup-node@v3
+        with:
+          node-version: '14'
+      - run: npm install
+      - name: Create SBOM with CycloneDX
+        uses: CycloneDX/gh-node-module-generatebom@master
+        with: 
+          output: './test.app.bom.xml'
+```
 
 ## Privacy
 

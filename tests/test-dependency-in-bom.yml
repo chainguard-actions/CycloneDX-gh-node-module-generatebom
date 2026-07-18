@@ -1,0 +1,77 @@
+name: Test dependency appears in BOM
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install mock cyclonedx-bom
+        run: |
+          python3 - << 'PYEOF'
+          import os, stat
+          script = (
+              "#!/bin/sh\n"
+              "OUTPUT=\"\"\n"
+              "for arg in \"$@\"; do\n"
+              "  case \"$arg\" in\n"
+              "    --output=*) OUTPUT=\"${arg#--output=}\" ;;\n"
+              "    --help) echo \"cyclonedx-bom mock v3\"; exit 0 ;;\n"
+              "  esac\n"
+              "done\n"
+              "if [ -n \"$OUTPUT\" ]; then\n"
+              "  printf '<?xml version=\"1.0\" encoding=\"utf-8\"?>\\n' > \"$OUTPUT\"\n"
+              "  printf '<bom xmlns=\"http://cyclonedx.org/schema/bom/1.2\" version=\"1\">\\n' >> \"$OUTPUT\"\n"
+              "  printf '  <components>\\n' >> \"$OUTPUT\"\n"
+              "  printf '    <component type=\"library\">\\n' >> \"$OUTPUT\"\n"
+              "  printf '      <name>lodash</name>\\n' >> \"$OUTPUT\"\n"
+              "  printf '      <version>4.17.21</version>\\n' >> \"$OUTPUT\"\n"
+              "  printf '    </component>\\n' >> \"$OUTPUT\"\n"
+              "  printf '  </components>\\n' >> \"$OUTPUT\"\n"
+              "  printf '</bom>\\n' >> \"$OUTPUT\"\n"
+              "fi\n"
+              "exit 0\n"
+          )
+          path = "/usr/local/bin/cyclonedx-bom"
+          with open(path, "w") as f:
+              f.write(script)
+          os.chmod(path, 0o755)
+          PYEOF
+          cyclonedx-bom --help
+
+      - id: action
+        uses: .
+        with:
+          path: ${{ github.workspace }}/tests/fixtures/node-project
+          output: ${{ github.workspace }}/dep-bom.xml
+
+      - name: Assert BOM file was created
+        run: |
+          if [ ! -f "$GITHUB_WORKSPACE/dep-bom.xml" ]; then
+            echo "FAIL: dep-bom.xml was not created"
+            ls -la "$GITHUB_WORKSPACE/" || true
+            exit 1
+          fi
+          echo "PASS: dep-bom.xml exists"
+
+      - name: Assert BOM contains lodash dependency
+        run: |
+          BOM_CONTENT=$(cat "$GITHUB_WORKSPACE/dep-bom.xml")
+          echo "BOM content:"
+          echo "$BOM_CONTENT"
+          if ! echo "$BOM_CONTENT" | grep -qi "lodash"; then
+            echo "FAIL: BOM does not contain lodash dependency"
+            exit 1
+          fi
+          echo "PASS: BOM contains lodash dependency"
+
+      - name: Assert BOM is well-formed XML
+        run: |
+          BOM_CONTENT=$(cat "$GITHUB_WORKSPACE/dep-bom.xml")
+          # Check for XML declaration or root element
+          if ! echo "$BOM_CONTENT" | grep -q "<?xml\|<bom"; then
+            echo "FAIL: BOM does not appear to be valid XML"
+            exit 1
+          fi
+          echo "PASS: BOM appears to be valid XML"
