@@ -1,0 +1,51 @@
+name: Test basic BOM generation
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install fake cyclonedx-bom on PATH
+        run: |
+          mkdir -p /usr/local/bin
+          cp "$GITHUB_WORKSPACE/tests/fixtures/fake-cyclonedx-bom.sh" /usr/local/bin/cyclonedx-bom
+          chmod +x /usr/local/bin/cyclonedx-bom
+          cyclonedx-bom --help
+
+      - id: action
+        uses: .
+        with:
+          path: ./tests/fixtures/node-project
+          output: ./bom-basic.xml
+
+      - name: Assert BOM file was created
+        run: |
+          echo "Listing workspace root:"
+          ls -la "$GITHUB_WORKSPACE/"
+          if [ ! -f "$GITHUB_WORKSPACE/bom-basic.xml" ]; then
+            echo "FAIL: BOM file bom-basic.xml was not created"
+            exit 1
+          fi
+          echo "PASS: BOM file exists"
+
+      - name: Assert BOM file contains CycloneDX XML content
+        run: |
+          CONTENT=$(cat "$GITHUB_WORKSPACE/bom-basic.xml")
+          echo "BOM contents:"
+          echo "$CONTENT"
+          if ! echo "$CONTENT" | grep -qi "cyclonedx"; then
+            echo "FAIL: BOM file does not contain 'cyclonedx' marker"
+            exit 1
+          fi
+          echo "PASS: BOM file contains CycloneDX content"
+
+      - name: Assert BOM file contains the test dependency
+        run: |
+          CONTENT=$(cat "$GITHUB_WORKSPACE/bom-basic.xml")
+          if ! echo "$CONTENT" | grep -qi "lodash"; then
+            echo "FAIL: BOM file does not contain 'lodash' dependency"
+            exit 1
+          fi
+          echo "PASS: BOM file contains lodash dependency"

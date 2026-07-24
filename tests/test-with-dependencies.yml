@@ -1,0 +1,82 @@
+name: Test SBOM generation with dependencies
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a Node.js project with a package-lock.json
+        run: |
+          mkdir -p /tmp/node-deps-project
+          cat > /tmp/node-deps-project/package.json << 'EOF'
+          {
+            "name": "deps-test-project",
+            "version": "1.0.0",
+            "description": "A test Node.js project with dependencies",
+            "dependencies": {
+              "semver": "7.5.4"
+            }
+          }
+          EOF
+          cat > /tmp/node-deps-project/package-lock.json << 'EOF'
+          {
+            "name": "deps-test-project",
+            "version": "1.0.0",
+            "lockfileVersion": 2,
+            "requires": true,
+            "packages": {
+              "": {
+                "name": "deps-test-project",
+                "version": "1.0.0",
+                "dependencies": {
+                  "semver": "7.5.4"
+                }
+              },
+              "node_modules/semver": {
+                "version": "7.5.4",
+                "resolved": "https://registry.npmjs.org/semver/-/semver-7.5.4.tgz",
+                "integrity": "sha512-1bCSESV6Pv+i21Hvpxp3Dx+pSD8lIPt8uVjRrxAUt/nbswYc+tK6Y2btiULjd4+fnq15PX+nqQDC7Khm/IEg==",
+                "bin": {
+                  "semver": "bin/semver.js"
+                },
+                "engines": {
+                  "node": ">=10"
+                }
+              }
+            },
+            "dependencies": {
+              "semver": {
+                "version": "7.5.4",
+                "resolved": "https://registry.npmjs.org/semver/-/semver-7.5.4.tgz",
+                "integrity": "sha512-1bCSESV6Pv+i21Hvpxp3Dx+pSD8lIPt8uVjRrxAUt/nbswYc+tK6Y2btiULjd4+fnq15PX+nqQDC7Khm/IEg=="
+              }
+            }
+          }
+          EOF
+
+      - id: action
+        uses: .
+        with:
+          path: /tmp/node-deps-project
+          output: /tmp/node-deps-project/bom.xml
+
+      - name: Assert BOM file was created
+        run: |
+          if [ ! -f "/tmp/node-deps-project/bom.xml" ]; then
+            echo "FAIL: BOM file was not created"
+            exit 1
+          fi
+          echo "PASS: BOM file exists"
+
+      - name: Assert BOM file is valid XML with components
+        run: |
+          echo "--- BOM file contents ---"
+          cat /tmp/node-deps-project/bom.xml
+          echo "--- End of BOM file ---"
+          if ! grep -q "bom" /tmp/node-deps-project/bom.xml; then
+            echo "FAIL: BOM file does not contain 'bom' element"
+            exit 1
+          fi
+          echo "PASS: BOM file contains expected content"

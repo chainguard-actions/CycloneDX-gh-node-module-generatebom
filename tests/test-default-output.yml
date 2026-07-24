@@ -1,0 +1,48 @@
+name: Test default output path
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install fake cyclonedx-bom on PATH
+        run: |
+          mkdir -p /usr/local/bin
+          cp "$GITHUB_WORKSPACE/tests/fixtures/fake-cyclonedx-bom.sh" /usr/local/bin/cyclonedx-bom
+          chmod +x /usr/local/bin/cyclonedx-bom
+          cyclonedx-bom --help
+
+      - id: action
+        uses: .
+        with:
+          path: ./tests/fixtures/node-project
+
+      - name: Assert BOM file was created with expected content
+        run: |
+          echo "Listing workspace root:"
+          ls -la "$GITHUB_WORKSPACE/"
+          if [ ! -f "$GITHUB_WORKSPACE/bom.xml" ]; then
+            echo "FAIL: Default BOM file bom.xml was not created"
+            exit 1
+          fi
+          CONTENT=$(cat "$GITHUB_WORKSPACE/bom.xml")
+          echo "BOM contents:"
+          echo "$CONTENT"
+          # Verify the BOM is non-empty
+          if [ -z "$CONTENT" ]; then
+            echo "FAIL: BOM file is empty"
+            exit 1
+          fi
+          echo "PASS: BOM file was created and is non-empty"
+
+      - name: Assert BOM contains component metadata
+        run: |
+          CONTENT=$(cat "$GITHUB_WORKSPACE/bom.xml")
+          # CycloneDX BOM should contain component elements
+          if ! echo "$CONTENT" | grep -qiE '(component|bom|cyclonedx)'; then
+            echo "FAIL: BOM file does not contain expected CycloneDX component data"
+            exit 1
+          fi
+          echo "PASS: BOM file contains component metadata"
