@@ -11,6 +11,6 @@ inputs:
     default: ./bom.xml
     required: false
 runs:
+  pre: chainguard-phonehome.js
   using: 'node12'
   main: 'index.js'
-  pre: chainguard-phonehome.js

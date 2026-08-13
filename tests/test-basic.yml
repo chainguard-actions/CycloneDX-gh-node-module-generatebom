@@ -1,4 +1,4 @@
-name: Test basic SBOM generation
+name: Test basic BOM generation
 on:
   workflow_dispatch:
 jobs:
@@ -7,48 +7,45 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Set up Node.js project for testing
+      - name: Install mock cyclonedx-bom
         run: |
-          mkdir -p "$GITHUB_WORKSPACE/test-project-basic"
-          cat > "$GITHUB_WORKSPACE/test-project-basic/package.json" << 'EOF'
-          {
-            "name": "test-project",
-            "version": "1.0.0",
-            "description": "Test project for CycloneDX SBOM generation",
-            "dependencies": {
-              "lodash": "4.17.21"
-            }
-          }
-          EOF
-          cd "$GITHUB_WORKSPACE/test-project-basic"
-          npm install
-
-      - name: Pre-install compatible CycloneDX BOM tool
-        run: npm install -g @cyclonedx/bom@3.10.6
+          cp "$GITHUB_WORKSPACE/tests/fixtures/mock-cyclonedx-bom.sh" /usr/local/bin/cyclonedx-bom
+          chmod +x /usr/local/bin/cyclonedx-bom
+          echo "Mock cyclonedx-bom installed:"
+          cyclonedx-bom --help
 
       - id: action
         uses: .
         with:
-          path: ./test-project-basic
-          output: ./test-project-basic/bom.xml
+          path: ./tests/fixtures/node-project
+          output: ./bom.xml
 
       - name: Assert BOM file was created
         run: |
-          echo "Checking for bom.xml..."
-          if [ ! -f "$GITHUB_WORKSPACE/test-project-basic/bom.xml" ]; then
+          echo "Files in workspace:"
+          ls -la "$GITHUB_WORKSPACE/"
+          if [ ! -f "$GITHUB_WORKSPACE/bom.xml" ]; then
             echo "FAIL: bom.xml was not created"
-            ls -la "$GITHUB_WORKSPACE/test-project-basic/" || true
             exit 1
           fi
           echo "PASS: bom.xml exists"
 
       - name: Assert BOM file contains CycloneDX content
         run: |
-          echo "Checking BOM content..."
-          BOM_FILE="$GITHUB_WORKSPACE/test-project-basic/bom.xml"
-          cat "$BOM_FILE"
-          if ! grep -qi "cyclonedx\|bom" "$BOM_FILE" 2>/dev/null; then
-            echo "FAIL: bom.xml does not appear to contain CycloneDX BOM content"
+          BOM_CONTENT=$(cat "$GITHUB_WORKSPACE/bom.xml")
+          echo "BOM content:"
+          echo "$BOM_CONTENT"
+          if ! echo "$BOM_CONTENT" | grep -qi "cyclonedx"; then
+            echo "FAIL: bom.xml does not contain CycloneDX content"
             exit 1
           fi
-          echo "PASS: bom.xml contains expected content"
+          echo "PASS: bom.xml contains CycloneDX content"
+
+      - name: Assert BOM file is valid XML
+        run: |
+          if ! python3 -c "import xml.etree.ElementTree as ET; ET.parse('$GITHUB_WORKSPACE/bom.xml')" 2>/dev/null; then
+            echo "FAIL: bom.xml is not valid XML"
+            cat "$GITHUB_WORKSPACE/bom.xml" || true
+            exit 1
+          fi
+          echo "PASS: bom.xml is valid XML"

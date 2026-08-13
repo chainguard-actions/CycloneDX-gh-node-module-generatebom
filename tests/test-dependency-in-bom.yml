@@ -1,0 +1,51 @@
+name: Test dependency appears in BOM
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install mock cyclonedx-bom
+        run: |
+          cp "$GITHUB_WORKSPACE/tests/fixtures/mock-cyclonedx-bom.sh" /usr/local/bin/cyclonedx-bom
+          chmod +x /usr/local/bin/cyclonedx-bom
+          echo "Mock cyclonedx-bom installed:"
+          cyclonedx-bom --help
+
+      - id: action
+        uses: .
+        with:
+          path: ./tests/fixtures/node-project
+          output: ./bom-deps.xml
+
+      - name: Assert BOM file was created
+        run: |
+          echo "Files in workspace:"
+          ls -la "$GITHUB_WORKSPACE/"
+          if [ ! -f "$GITHUB_WORKSPACE/bom-deps.xml" ]; then
+            echo "FAIL: bom-deps.xml was not created"
+            exit 1
+          fi
+          echo "PASS: bom-deps.xml exists"
+
+      - name: Assert lodash dependency appears in BOM
+        run: |
+          BOM_CONTENT=$(cat "$GITHUB_WORKSPACE/bom-deps.xml")
+          echo "BOM content:"
+          echo "$BOM_CONTENT"
+          if ! echo "$BOM_CONTENT" | grep -qi "lodash"; then
+            echo "FAIL: lodash dependency not found in BOM"
+            exit 1
+          fi
+          echo "PASS: lodash dependency found in BOM"
+
+      - name: Assert BOM contains component elements
+        run: |
+          BOM_CONTENT=$(cat "$GITHUB_WORKSPACE/bom-deps.xml")
+          if ! echo "$BOM_CONTENT" | grep -qi "component"; then
+            echo "FAIL: no component elements found in BOM"
+            exit 1
+          fi
+          echo "PASS: component elements found in BOM"
